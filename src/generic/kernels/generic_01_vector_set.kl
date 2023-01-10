@@ -1,0 +1,20 @@
+#include <math21_kernels.h>
+
+// y = x
+MATH21_KERNEL_TEMPLATE_HEADER_2(NumType1, NumType2)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_2(math21_template_vector_set_by_vector, NumType1, NumType2)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumType1 *x, NumN stride_x, MATH21_KERNEL_GLOBAL NumType2 *y,
+        NumN stride_y MATH21_KERNEL_INPUT_OFFSETS_XY MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x += offset_x;
+    y += offset_y;
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN ix, iy;
+    ix = (id - 1) * stride_x + 1;
+    iy = (id - 1) * stride_y + 1;
+    y[iy] = x[ix];
+}

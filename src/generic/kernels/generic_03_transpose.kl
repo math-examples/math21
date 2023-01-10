@@ -1,0 +1,85 @@
+#include <math21_kernels.h>
+
+// y = x.t
+MATH21_KERNEL_TEMPLATE_HEADER_2(NumType1, NumType2)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_2(math21_template_matrix_transpose, NumType1, NumType2)(
+        NumN n,
+        MATH21_KERNEL_GLOBAL const NumType1 *x,
+        MATH21_KERNEL_GLOBAL NumType2 *y,
+        NumN d1_x, NumN d2_x MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i2, ix, iy;
+    iy = id;
+    math21_device_index_1d_to_2d(&i2, &i1, iy, d2_x, d1_x);
+    math21_device_index_2d_to_1d(i1, i2, &ix, d1_x, d2_x);
+    y[iy] = x[ix];
+}
+
+// rotate pi/2 counter-clockwise
+MATH21_KERNEL_TEMPLATE_HEADER_2(NumType1, NumType2)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_2(math21_template_matrix_trans_reverse_axis, NumType1, NumType2)(
+        NumN n,
+        MATH21_KERNEL_GLOBAL const NumType1 *x,
+        MATH21_KERNEL_GLOBAL NumType2 *y,
+        NumN d1_x, NumN d2_x MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i2, ix, iy;
+    iy = id;
+    math21_device_index_1d_to_2d(&i2, &i1, iy, d2_x, d1_x);
+    math21_device_index_2d_to_1d(i1, d2_x + 1 - i2, &ix, d1_x, d2_x);
+    y[iy] = x[ix];
+}
+
+// rotate pi/2 clockwise
+MATH21_KERNEL_TEMPLATE_HEADER_2(NumType1, NumType2)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_2(math21_template_matrix_trans_reverse_y_axis, NumType1, NumType2)(
+        NumN n,
+        MATH21_KERNEL_GLOBAL const NumType1 *x,
+        MATH21_KERNEL_GLOBAL NumType2 *y,
+        NumN d1_x, NumN d2_x MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i2, ix, iy;
+    iy = id;
+    math21_device_index_1d_to_2d(&i2, &i1, iy, d2_x, d1_x);
+    math21_device_index_2d_to_1d(d1_x + 1 - i1, i2, &ix, d1_x, d2_x);
+    y[iy] = x[ix];
+}
+
+// swap axes 2 and 4 in dim5 tensor
+// (d1, d2, d3, d4, d5) -> (d1, d4, d3, d2, d5)
+MATH21_KERNEL_TEMPLATE_HEADER_2(NumType1, NumType2)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_2(math21_template_tensor_swap_axes_24_in_d5, NumType1, NumType2)(
+        NumN n,
+        MATH21_KERNEL_GLOBAL const NumType1 *x,
+        MATH21_KERNEL_GLOBAL NumType2 *y,
+        NumN d1, NumN d2, NumN d3, NumN d4, NumN d5 MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i2, i3, i4, i5, ix, iy;
+    iy = id;
+    math21_device_index_1d_to_5d(&i1, &i4, &i3, &i2, &i5, iy, d1, d4, d3, d2, d5);
+    math21_device_index_5d_to_1d(i1, i2, i3, i4, i5, &ix, d1, d2, d3, d4, d5);
+    y[iy] = x[ix];
+}

@@ -1,0 +1,143 @@
+#include <math21_kernels.h>
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_kx, NumReal)(
+        NumN n, NumReal k, MATH21_KERNEL_GLOBAL NumReal *x, NumN stride_x MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id <= n) x[(id - 1) * stride_x] *= k;
+}
+
+// y = k*x + y
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_kx_add_y, NumReal)(
+        NumN n, NumReal k, MATH21_KERNEL_GLOBAL const NumReal *x, NumN stride_x, MATH21_KERNEL_GLOBAL NumReal *y,
+        NumN stride_y MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    y[(id - 1) * stride_y + 1] += k * x[(id - 1) * stride_x + 1];
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_xy, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumReal *x, NumN stride_x, MATH21_KERNEL_GLOBAL NumReal *y,
+        NumN stride_y MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    y[(id - 1) * stride_y + 1] *= x[(id - 1) * stride_x + 1];
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_sin, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumReal *x, MATH21_KERNEL_GLOBAL NumReal *y MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id > n) return;
+    y[id - 1] = sin(x[id - 1]);
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_cos, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumReal *x, MATH21_KERNEL_GLOBAL NumReal *y MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id <= n) y[id - 1] = cos(x[id - 1]);
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_tensor_3d_swap_row_in_d2, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL NumReal *x, NumN i, NumN j, NumN d1, NumN d2, NumN d3 MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i3, ix1, ix2;
+    math21_device_index_1d_to_2d_fast(&i1, &i3, id, d3);
+    math21_device_index_3d_to_1d_fast(i1, i, i3, &ix1, d2, d3);
+    math21_device_index_3d_to_1d_fast(i1, j, i3, &ix2, d2, d3);
+    NumReal dum = x[ix1];
+    x[ix1] = x[ix2];
+    x[ix2] = dum;
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_addToC, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumReal *A, MATH21_KERNEL_GLOBAL const NumReal *B,
+        MATH21_KERNEL_GLOBAL NumReal *C MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id <= n) C[id - 1] = A[id - 1] + B[id - 1];
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_mulToC, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumReal *A, MATH21_KERNEL_GLOBAL const NumReal *B,
+        MATH21_KERNEL_GLOBAL NumReal *C MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id <= n) C[id - 1] = A[id - 1] * B[id - 1];
+}
+
+// a special kind of sub
+// x is sub-tensor of y
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_broadcast_in_dn, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL const NumReal *x, MATH21_KERNEL_GLOBAL NumReal *y,
+        NumN dims_x, MATH21_KERNEL_GLOBAL const NumN *dx,
+        NumN dims_y, MATH21_KERNEL_GLOBAL const NumN *dy MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+    dx -= 1;
+    dy -= 1;
+#endif
+
+    if (id > n) return;
+    NumN _indexx[MATH21_KERNEL_ARRAY_MAX_LENGTH], _indexy[MATH21_KERNEL_ARRAY_MAX_LENGTH], ix, iy;
+    NumN *indexx = math21_device_pointer_NumN_decrease_one(_indexx);
+    NumN *indexy = math21_device_pointer_NumN_decrease_one(_indexy);
+
+    iy = id;
+    math21_device_index_1d_to_nd(indexy, iy, dy, dims_y);
+    math21_device_broadcast_index_to_original_brackets(indexy, dx, indexx, dims_x);
+    math21_device_index_nd_to_1d(indexx, &ix, dx, dims_x);
+    y[iy] = x[ix];
+
+}
+
+// todo: optimize
+// alpha_t = alpha * sqrt(1 - beta2^t) / (1 - beta1^t),
+// eps_hat, see tensorflow/python/training/adam.py
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_optimization_adam_update_part_2, NumReal)(NumN x_size, MATH21_KERNEL_GLOBAL
+                                                                                  NumReal *x,
+                                                                                  MATH21_KERNEL_GLOBAL const NumReal *m,
+                                                                                  MATH21_KERNEL_GLOBAL const NumReal *v,
+                                                                                  NumReal beta1, NumReal beta2,
+                                                                                  NumReal alpha, NumReal eps,
+                                                                                  NumN t MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    m -= 1;
+    v -= 1;
+#endif
+
+    if (id > x_size) return;
+    // compute bias-corrected first moment estimate
+//    NumReal mhat = m[id] / (1.f - powf(beta1, t));
+    NumReal mhat = m[id] / (1.f - pow(beta1, t));
+    // compute bias-corrected second raw moment estimate
+    NumReal vhat = v[id] / (1.f - pow(beta2, t));
+
+    // update
+    // x = x - alpha * m / (sqrt(v) + eps)
+//    x[id] = x[id] + alpha * mhat / (sqrtf(vhat) + eps);
+    x[id] = x[id] + alpha * mhat / (sqrt(vhat) + eps);
+}

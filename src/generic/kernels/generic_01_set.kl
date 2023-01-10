@@ -1,0 +1,96 @@
+#include <math21_kernels.h>
+
+// see math21_template_subtensor_like_set_or_get_using_mask_in_d3
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_tensor_subregion_set_or_get, NumReal)(
+        NumN n, MATH21_KERNEL_GLOBAL NumReal *x, MATH21_KERNEL_GLOBAL NumReal *y, NumN dims,
+        MATH21_KERNEL_GLOBAL const NumN *dx,
+        MATH21_KERNEL_GLOBAL const NumN *dy,
+        MATH21_KERNEL_GLOBAL const NumN *offset,
+        NumB isGet MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+    y -= 1;
+    dx -= 1;
+    dy -= 1;
+    offset -= 1;
+#endif
+    if (id > n) return;
+    NumN _indexx[MATH21_KERNEL_ARRAY_MAX_LENGTH], _indexy[MATH21_KERNEL_ARRAY_MAX_LENGTH], ix, iy;
+    NumN *indexx = math21_device_pointer_NumN_decrease_one(_indexx);
+    NumN *indexy = math21_device_pointer_NumN_decrease_one(_indexy);
+
+    ix = id;
+    math21_device_index_1d_to_nd(indexx, ix, dx, dims);
+    math21_device_index_add_to_c_2(dims, indexx, offset, indexy);
+    math21_device_index_nd_to_1d(indexy, &iy, dy, dims);
+    if (!isGet) {
+        y[iy] = x[ix];
+    } else {
+        x[ix] = y[iy];
+    }
+}
+
+// 1, 2, 3 -> 1, 4, 7 when stride is 3.
+// d2_x = stride1_x * trailing_dimension
+// y = x
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_matrix_set_by_matrix, NumReal)(
+        NumN n, NumN d2,
+        MATH21_KERNEL_GLOBAL const NumReal *x, NumN d2_x, NumN stride2_x,
+        MATH21_KERNEL_GLOBAL NumReal *y, NumN d2_y, NumN stride2_y
+        MATH21_KERNEL_INPUT_OFFSETS_XY MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x += offset_x;
+    y += offset_y;
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i2, iy, ix;
+    math21_device_index_1d_to_2d_fast(&i1, &i2, id, d2);
+    math21_device_index_2d_to_1d_fast(i1, (i2 - 1) * stride2_x + 1, &ix, d2_x);
+    math21_device_index_2d_to_1d_fast(i1, (i2 - 1) * stride2_y + 1, &iy, d2_y);
+    y[iy] = x[ix];
+}
+
+// 1, 2, 3 -> 1, 4, 7 when stride is 3.
+// d2_x <- stride1_x * d2_x
+// y = x
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_tensor_3d_set_by_tensor_3d, NumReal)(
+        NumN n, NumN d2, NumN d3,
+        MATH21_KERNEL_GLOBAL const NumReal *x, NumN d2_x, NumN d3_x, NumN stride3_x,
+        MATH21_KERNEL_GLOBAL NumReal *y, NumN d2_y, NumN d3_y, NumN stride3_y
+        MATH21_KERNEL_INPUT_OFFSETS_XY MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x += offset_x;
+    y += offset_y;
+    x -= 1;
+    y -= 1;
+#endif
+    if (id > n) return;
+    NumN i1, i2, i3, iy, ix;
+    math21_device_index_1d_to_3d_fast(&i1, &i2, &i3, id, d2, d3);
+    math21_device_index_3d_to_1d_fast(i1, i2, (i3 - 1) * stride3_x + 1, &ix, d2_x, d3_x);
+    math21_device_index_3d_to_1d_fast(i1, i2, (i3 - 1) * stride3_y + 1, &iy, d2_y, d3_y);
+    y[iy] = x[ix];
+}
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void
+MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_vector_set_by_value, NumReal)(
+        NumN n, NumReal value, MATH21_KERNEL_GLOBAL NumReal *x, NumN stride_x MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+#if defined(MATH21_IS_FROM_OPENCL)
+    x -= 1;
+#endif
+    if (id > n) return;
+    x[(id - 1) * stride_x + 1] = value;
+}

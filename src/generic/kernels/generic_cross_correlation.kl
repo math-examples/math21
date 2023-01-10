@@ -1,0 +1,196 @@
+#include <math21_kernels.h>
+
+/**
+(1)
+ir_X = ic1_Xprime * nr_s + ir_k * nr_d - nr_p;
+     = ir_X_abs + ir_k * nr_d;
+where
+ir_X_abs = ic1_Xprime * nr_s - nr_p;
+
+Similarly for ic_X_abs and ic_X.
+
+So,
+index_X
+= (ich_X * nr_X + ir_X) * nc_X + ic_X
+= (ich_X * nr_X + (ir_X_abs + ir_k * nr_d) ) * nc_X + (ic_X_abs + ic_k * nc_d)
+= (ich_X * nr_X + (ir_X_abs + ir_k * nr_d) ) * nc_X + (ic_X_abs + ic_k * nc_d)
+= (ich_X * nr_X + ir_X_abs ) * nc_X + ic_X_abs
+            + ir_k * nr_d * nc_X + ic_k * nc_d
+
+(2)
+Because
+nr_X_prime = nch_X * nr_k * nc_k;
+ir_Xprime = (ich_X, ir_k, ic_k)
+ir_Xprime = ich_X * nr_k * nc_k + ir_k * nc_k + ic_k
+X_prime size: (nch_X * nr_k * nc_k ) * (nc_X_prime_1 * nc_X_prime_2)
+,
+
+index_Xprime
+= ir_Xprime * nc_X_prime_1 * nc_X_prime_2 + ic1_Xprime * nc_X_prime_2  + ic2_Xprime
+= (ich_X * nr_k * nc_k + ir_k * nc_k + ic_k) * nc_X_prime_1 * nc_X_prime_2
+                                               + ic1_Xprime * nc_X_prime_2
+                                                              + ic2_Xprime
+= ich_X * nr_k * nc_k * nc_X_prime_1 * nc_X_prime_2
+                        + ic1_Xprime * nc_X_prime_2
+                                       + ic2_Xprime
++ (ir_k * nc_k + ic_k) * nc_X_prime_1 * nc_X_prime_2
+ * */
+
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_cross_correlation_X_to_X_prime, NumReal)(
+        int n,
+        MATH21_KERNEL_GLOBAL const NumReal *X, MATH21_KERNEL_GLOBAL NumReal *X_prime,
+        int nr_X, int nc_X,
+        int nr_k, int nc_k,
+        int nr_p, int nc_p,
+        int nr_s, int nc_s,
+        int nr_d, int nc_d,
+        int nc_X_prime_1,
+        int nc_X_prime_2
+        MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id > n) return;
+    int index = id - 1;
+    int ic2_Xprime = index % nc_X_prime_2;
+    index = index / nc_X_prime_2;
+    int ic1_Xprime = index % nc_X_prime_1;
+    int ich_X = index / nc_X_prime_1;
+
+    int ir_X_abs = ic1_Xprime * nr_s - nr_p;
+    int ic_X_abs = ic2_Xprime * nc_s - nc_p;
+    X_prime += (ich_X * nr_k * nc_k * nc_X_prime_1 + ic1_Xprime) * nc_X_prime_2 + ic2_Xprime;
+    X += (ich_X * nr_X + ir_X_abs) * nc_X + ic_X_abs;
+    for (int ir_k = 0; ir_k < nr_k; ++ir_k) {
+        for (int ic_k = 0; ic_k < nc_k; ++ic_k) {
+            int ir_X = ir_X_abs + ir_k * nr_d;
+            int ic_X = ic_X_abs + ic_k * nc_d;
+            *X_prime = (ir_X >= 0 && ic_X >= 0 && ir_X < nr_X && ic_X < nc_X) ?
+                       X[ir_k * nr_d * nc_X + ic_k * nc_d] : 0;
+            X_prime += nc_X_prime_1 * nc_X_prime_2;
+        }
+    }
+}
+
+
+/**
+* theorem 1:
+* ceil((x+1)/s) = floor(x/s) + 1, for any s in N, x in Z.
+* */
+
+/**
+theorem 2:
+
+index_Xprime = (((ich_X * nr_k + ir_k) * nc_k + ic_k) * nc_X_prime_1 + i1_Xprime) * nc_X_prime_2 + i2_Xprime;
+
+index_Xprime
+= ich_X * nr_k * nc_k * nc_X_prime_1 * nc_X_prime_2
+        + ir_k * nc_k * nc_X_prime_1 * nc_X_prime_2
+               + ic_k * nc_X_prime_1 * nc_X_prime_2
+                      +    i1_Xprime * nc_X_prime_2
+                                     +    i2_Xprime;
+
+if nr_d = 1 and nc_d = 1,
+and because
+ir_k = ir_X - i1_Xprime * nr_s;
+ic_k = ic_X - i2_Xprime * nc_s;
+then
+index_Xprime
+= ich_X * nr_k                      * nc_k * nc_X_prime_1 * nc_X_prime_2
+        + (ir_X - i1_Xprime * nr_s) * nc_k * nc_X_prime_1 * nc_X_prime_2
+               + (ic_X - i2_Xprime * nc_s) * nc_X_prime_1 * nc_X_prime_2
+                                           +    i1_Xprime * nc_X_prime_2
+                                                          +    i2_Xprime;
+= ich_X * nr_k  * nc_k * nc_X_prime_1 * nc_X_prime_2
+        + ir_X  * nc_k * nc_X_prime_1 * nc_X_prime_2
+                + ic_X * nc_X_prime_1 * nc_X_prime_2
+                - i1_Xprime * nr_s * nc_k * nc_X_prime_1 * nc_X_prime_2
+                + i1_Xprime * nc_X_prime_2
+                - i2_Xprime * nc_s * nc_X_prime_1 * nc_X_prime_2
+                + i2_Xprime;
+= offset + i1_Xprime * coeff1 + i2_Xprime * coeff2;
+where
+offset
+= (ich_X * nr_k * nc_k + ir_X * nc_k + ic_X) * nc_X_prime_1 * nc_X_prime_2;
+coeff1 = (1 - nr_s * nc_k * nc_X_prime_1) * nc_X_prime_2;
+coeff2 = 1 - nc_s * nc_X_prime_1 * nc_X_prime_2;
+ * */
+
+// Note it uses += instead of =
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_cross_correlation_dX_prime_to_dX_without_dilation_addto, NumReal)(
+        int n,
+        MATH21_KERNEL_GLOBAL const NumReal *dX_prime, MATH21_KERNEL_GLOBAL NumReal *dX,
+        int nr_X, int nc_X,
+        int nr_k, int nc_k,
+        int nr_p, int nc_p,
+        int nr_s, int nc_s,
+        int nc_X_prime_1,
+        int nc_X_prime_2
+        MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id > n) return;
+    int index = id - 1;
+    NumReal val = 0;
+    int ic_X = index % nc_X + nc_p;
+    int ir_X = (index / nc_X) % nr_X + nr_p;
+    int ich_X = index / (nc_X * nr_X);
+    int start1_Xprime = (ir_X < nr_k) ? 0 : (ir_X - nr_k) / nr_s + 1;
+    int end1_Xprime = math21_device_min_N(ir_X / nr_s + 1, nc_X_prime_1);
+    int start2_Xprime = (ic_X < nc_k) ? 0 : (ic_X - nc_k) / nc_s + 1;
+    int end2_Xprime = math21_device_min_N(ic_X / nc_s + 1, nc_X_prime_2);
+    // see theorem 2
+    int offset = (ich_X * nr_k * nc_k + ir_X * nc_k + ic_X) * nc_X_prime_1 * nc_X_prime_2;
+    int coeff1 = (1 - nr_s * nc_k * nc_X_prime_1) * nc_X_prime_2;
+    int coeff2 = (1 - nc_s * nc_X_prime_1 * nc_X_prime_2);
+    for (int i1_Xprime = start1_Xprime; i1_Xprime < end1_Xprime; ++i1_Xprime) {
+        for (int i2_Xprime = start2_Xprime; i2_Xprime < end2_Xprime; ++i2_Xprime) {
+            int index_Xprime = offset + i1_Xprime * coeff1 + i2_Xprime * coeff2;
+            val += dX_prime[index_Xprime];
+        }
+    }
+    dX[index] += val;
+}
+
+// Note it uses += instead of =
+MATH21_KERNEL_TEMPLATE_HEADER_1(NumReal)
+MATH21_KERNEL_EXPORT void MATH21_MAKE_KERNEL_NAME_SUFFIX_1(math21_template_cross_correlation_dX_prime_to_dX_addto, NumReal)(
+        int n,
+        MATH21_KERNEL_GLOBAL     const NumReal *dX_prime, MATH21_KERNEL_GLOBAL NumReal *dX,
+        int nr_X, int nc_X,
+        int nr_k, int nc_k,
+        int nr_p, int nc_p,
+        int nr_s, int nc_s,
+        int nr_d, int nc_d,
+        int nc_X_prime_1, int nc_X_prime_2
+        MATH21_KERNEL_INPUT_ID) {
+    MATH21_KERNEL_GET_ID();
+    if (id > n) return;
+    int index = id - 1;
+    NumReal val = 0;
+    int ic_X = index % nc_X + nc_p;
+    int ir_X = (index / nc_X) % nr_X + nr_p;
+    int ich_X = index / (nc_X * nr_X);
+    int nr_k_ext = (nr_k - 1) * nr_d + 1;
+    int nc_k_ext = (nc_k - 1) * nc_d + 1;
+    // ceil((ir_X - nr_k + 1) / nr_s) = (ir_X - nr_k) / nr_s + 1. see theorem 1
+    int start1_Xprime = (ir_X < nr_k_ext) ? 0 : (ir_X - nr_k_ext) / nr_s + 1;
+    int end1_Xprime = math21_device_min_N(ir_X / nr_s + 1, nc_X_prime_1);
+    int start2_Xprime = (ic_X < nc_k_ext) ? 0 : (ic_X - nc_k_ext) / nc_s + 1;
+    int end2_Xprime = math21_device_min_N(ic_X / nc_s + 1, nc_X_prime_2);
+
+    // TODO (caffe): use LCM of stride and dilation to avoid unnecessary loops
+    for (int i1_Xprime = start1_Xprime; i1_Xprime < end1_Xprime; ++i1_Xprime) {
+        for (int i2_Xprime = start2_Xprime; i2_Xprime < end2_Xprime; ++i2_Xprime) {
+            int ir_k = ir_X - i1_Xprime * nr_s;
+            int ic_k = ic_X - i2_Xprime * nc_s;
+            if (ir_k % nr_d == 0 && ic_k % nc_d == 0) {
+                ir_k /= nr_d;
+                ic_k /= nc_d;
+                int index_Xprime =
+                        (((ich_X * nr_k + ir_k) * nc_k + ic_k) * nc_X_prime_1 + i1_Xprime) * nc_X_prime_2 + i2_Xprime;
+                val += dX_prime[index_Xprime];
+            }
+        }
+    }
+    dX[index] += val;
+}
